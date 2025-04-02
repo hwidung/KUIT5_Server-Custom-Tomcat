@@ -2,6 +2,7 @@ package webserver;
 
 import db.MemoryUserRepository;
 import http.util.HttpRequestUtils;
+import http.util.IOUtils;
 import model.User;
 
 import java.io.*;
@@ -34,12 +35,19 @@ public class RequestHandler implements Runnable {
 
             // 요청 라인에서 URI 파싱
             String[] tokens = requestLine.split(" ");
+            String method = tokens[0];
             String uri = tokens[1];
 
             if (uri.equals("/user/form.html")) {
                 handleFormRequest(dos);
             } else if (uri.startsWith("/user/signup")) {
-                handleUserCreate(uri, dos);
+                if (method.equals("POST")) {
+                    // POST 요청 처리
+                    handleUserCreatePost(br, dos);
+                } else {
+                    // GET 요청 처리
+                    handleUserCreateGet(uri, dos);
+                }
             } else {
                 // 기본 경로 설정
                 if (uri.equals("/")) {
@@ -63,6 +71,48 @@ public class RequestHandler implements Runnable {
         }
     }
 
+    private void handleUserCreateGet(String uri, DataOutputStream dos) throws IOException {
+        String queryString = uri.split("\\?")[1];
+        Map<String, String> params = HttpRequestUtils.parseQueryParameter(queryString);
+
+        String userId = params.get("userId");
+        String password = params.get("password");
+        String name = params.get("name");
+        String email = params.get("email");
+
+        User user = new User(userId, password, name, email);
+        MemoryUserRepository.getInstance().addUser(user);
+
+        response302Header(dos, "/index.html");
+    }
+
+    private void handleUserCreatePost(BufferedReader br, DataOutputStream dos) throws IOException {
+        int contentLength = 0;
+        while (true) {
+            final String line = br.readLine();
+            if (line.isEmpty()) {
+                break;
+            }
+            if (line.startsWith("Content-Length")) {
+                contentLength = Integer.parseInt(line.split(": ")[1]);
+            }
+        }
+
+        String body = IOUtils.readData(br, contentLength);
+        Map<String, String> params = HttpRequestUtils.parseQueryParameter(body);
+
+        String userId = params.get("userId");
+        String password = params.get("password");
+        String name = params.get("name");
+        String email = params.get("email");
+
+        User user = new User(userId, password, name, email);
+        MemoryUserRepository.getInstance().addUser(user);
+
+        response302Header(dos, "/index.html");
+
+    }
+
     private void handleFormRequest(DataOutputStream dos) throws IOException {
         String filePath = "./webapp/user/form.html";
         File file = new File(filePath);
@@ -74,24 +124,6 @@ public class RequestHandler implements Runnable {
         } else {
             response404Header(dos);
         }
-    }
-
-    private void handleUserCreate(String uri, DataOutputStream dos) throws IOException {
-        // 쿼리스트링 파싱
-        String queryString = uri.split("\\?")[1];
-        Map<String, String> params = HttpRequestUtils.parseQueryParameter(queryString);
-
-        // User 객체 생성 및 저장
-        String userId = params.get("userId");
-        String password = params.get("password");
-        String name = params.get("name");
-        String email = params.get("email");
-
-        User user = new User(userId, password, name, email);
-        MemoryUserRepository.getInstance().addUser(user);
-
-        // 302 리다이렉트 응답
-        response302Header(dos, "/index.html");
     }
 
     private void response200Header(DataOutputStream dos, int lengthOfBodyContent) throws IOException {
