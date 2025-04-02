@@ -69,7 +69,11 @@ public class RequestHandler implements Runnable {
 
                 if (file.exists()) {
                     byte[] body = Files.readAllBytes(file.toPath());
-                    response200Header(dos, body.length);
+                    if (uri.endsWith(".css")){
+                        response200Header(dos, body.length, "text/css");
+                    } else {
+                        response200Header(dos, body.length,"text/html");
+                    }
                     responseBody(dos, body);
                 } else {
                     // 404 Not Found 응답
@@ -101,7 +105,7 @@ public class RequestHandler implements Runnable {
             File file = new File(filePath);
             if (file.exists()){
                 byte[] body = Files.readAllBytes(file.toPath());
-                response200Header(dos, body.length);
+                response200Header(dos, body.length,"text/html");
                 responseBody(dos,body);
             } else {
                 response404Header(dos);
@@ -152,7 +156,7 @@ public class RequestHandler implements Runnable {
 
         if (file.exists()) {
             byte[] body = Files.readAllBytes(file.toPath());
-            response200Header(dos, body.length);
+            response200Header(dos, body.length, "text/html");
             responseBody(dos, body);
         } else {
             response404Header(dos);
@@ -208,16 +212,16 @@ public class RequestHandler implements Runnable {
 
         if (file.exists()) {
             byte[] body = Files.readAllBytes(file.toPath());
-            response200Header(dos, body.length);
+            response200Header(dos, body.length,"text/html");
             responseBody(dos, body);
         } else {
             response404Header(dos);
         }
     }
 
-    private void response200Header(DataOutputStream dos, int lengthOfBodyContent) throws IOException {
+    private void response200Header(DataOutputStream dos, int lengthOfBodyContent, String contentType) throws IOException {
         dos.writeBytes("HTTP/1.1 200 OK \r\n");
-        dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
+        dos.writeBytes("Content-Type: "+ contentType + ";charset=utf-8\r\n");
         dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
         dos.writeBytes("\r\n");
     }
