@@ -38,6 +38,7 @@ public class RequestHandler implements Runnable {
             String method = tokens[0];
             String uri = tokens[1];
             log.log(Level.INFO, "Method: " + method + ", URI: " + uri);
+
             if (uri.equals("/user/form.html")) {
                 handleFormRequest(dos);
             } else if (uri.equals("/user/login.html")) {
@@ -55,6 +56,8 @@ public class RequestHandler implements Runnable {
                     // GET 요청 처리
                     handleUserCreateGet(uri, dos);
                 }
+            } else if (uri.equals("/user/userList")) {
+                handleUserListRequest(br, dos);
             } else {
                 // 기본 경로 설정
                 if (uri.equals("/")) {
@@ -75,6 +78,36 @@ public class RequestHandler implements Runnable {
             }
         } catch (IOException e) {
             log.log(Level.SEVERE, e.getMessage());
+        }
+    }
+
+    private void handleUserListRequest(BufferedReader br, DataOutputStream dos) throws IOException {
+        // 헤더에서 쿠키 값 확인
+        String line;
+        boolean isLogined = false;
+        while (!(line = br.readLine()).isEmpty()){
+            if (line.startsWith("Cookie")){
+                String[] cookies = line.split(": ")[1].split("; ");
+                for (String cookie: cookies){
+                    if (cookie.equals("logined=true")){
+                        isLogined = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (isLogined){
+            String filePath = "./webapp/user/userList.html";
+            File file = new File(filePath);
+            if (file.exists()){
+                byte[] body = Files.readAllBytes(file.toPath());
+                response200Header(dos, body.length);
+                responseBody(dos,body);
+            } else {
+                response404Header(dos);
+            }
+        } else {
+            response302Header(dos, "/user/login.html");
         }
     }
 
