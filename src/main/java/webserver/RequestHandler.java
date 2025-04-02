@@ -32,14 +32,21 @@ public class RequestHandler implements Runnable {
             if (requestLine == null) {
                 return;
             }
-
+            log.log(Level.INFO, "Request Line: " + requestLine);
             // 요청 라인에서 URI 파싱
             String[] tokens = requestLine.split(" ");
             String method = tokens[0];
             String uri = tokens[1];
-
+            log.log(Level.INFO, "Method: " + method + ", URI: " + uri);
             if (uri.equals("/user/form.html")) {
                 handleFormRequest(dos);
+            } else if (uri.equals("/user/login.html")) {
+                handleLoginRequest(dos);
+            } else if (uri.startsWith("/user/login")) {
+                if (method.equals("POST")) {
+                    // POST 요청 처리
+                    handleUserLoginPost(br, dos);
+                }
             } else if (uri.startsWith("/user/signup")) {
                 if (method.equals("POST")) {
                     // POST 요청 처리
@@ -71,6 +78,54 @@ public class RequestHandler implements Runnable {
         }
     }
 
+    private void handleUserLoginPost(BufferedReader br, DataOutputStream dos) throws IOException {
+        int contentLength = 0;
+        while (true) {
+            final String line = br.readLine();
+            if (line.isEmpty()) {
+                break;
+            }
+            if (line.startsWith("Content-Length")) {
+                contentLength = Integer.parseInt(line.split(": ")[1]);
+            }
+        }
+        String body = IOUtils.readData(br, contentLength);
+        log.log(Level.INFO, "Request Body: " + body);
+        Map<String, String> params = HttpRequestUtils.parseQueryParameter(body);
+
+        String userId = params.get("userId");
+        String password = params.get("password");
+        log.log(Level.INFO, "Login Attempt: userId=" + userId + ", password=" + password);
+
+        User user = MemoryUserRepository.getInstance().findUserById(userId);
+        if (user != null && user.getPassword().equals(password)) {
+            log.log(Level.INFO, "Login Success: userId=" + userId);
+            dos.writeBytes("HTTP/1.1 302 Found \r\n");
+            dos.writeBytes("Location: /index.html \r\n");
+            dos.writeBytes("Set-Cookie: logined=true; Path=/ \r\n");
+            dos.writeBytes("\r\n");
+        } else {
+            log.log(Level.INFO, "Login Failed: userId=" + userId);
+            dos.writeBytes("HTTP/1.1 302 Found \r\n");
+            dos.writeBytes("Location: /user/login.html \r\n");
+            dos.writeBytes("Set-Cookie: logined=false; Path=/ \r\n");
+            dos.writeBytes("\r\n");
+        }
+    }
+
+    private void handleLoginRequest(DataOutputStream dos) throws IOException {
+        String filePath = "./webapp/user/login.html";
+        File file = new File(filePath);
+
+        if (file.exists()) {
+            byte[] body = Files.readAllBytes(file.toPath());
+            response200Header(dos, body.length);
+            responseBody(dos, body);
+        } else {
+            response404Header(dos);
+        }
+    }
+
     private void handleUserCreateGet(String uri, DataOutputStream dos) throws IOException {
         String queryString = uri.split("\\?")[1];
         Map<String, String> params = HttpRequestUtils.parseQueryParameter(queryString);
@@ -79,7 +134,7 @@ public class RequestHandler implements Runnable {
         String password = params.get("password");
         String name = params.get("name");
         String email = params.get("email");
-
+        log.log(Level.INFO, "Signup Attempt (GET): userId=" + userId + ", password=" + password + ", name=" + name + ", email=" + email);
         User user = new User(userId, password, name, email);
         MemoryUserRepository.getInstance().addUser(user);
 
@@ -99,6 +154,7 @@ public class RequestHandler implements Runnable {
         }
 
         String body = IOUtils.readData(br, contentLength);
+        log.log(Level.INFO, "Request Body: " + body);
         Map<String, String> params = HttpRequestUtils.parseQueryParameter(body);
 
         String userId = params.get("userId");
@@ -106,11 +162,11 @@ public class RequestHandler implements Runnable {
         String name = params.get("name");
         String email = params.get("email");
 
+        log.log(Level.INFO, "Signup Attempt (POST): userId=" + userId + ", password=" + password + ", name=" + name + ", email=" + email);
         User user = new User(userId, password, name, email);
         MemoryUserRepository.getInstance().addUser(user);
 
         response302Header(dos, "/index.html");
-
     }
 
     private void handleFormRequest(DataOutputStream dos) throws IOException {
